@@ -13,6 +13,9 @@
 # If both are present in .env, you will NOT be prompted for them.
 # If either is missing, you will be prompted as before.
 #
+# CSV files are saved in the 'csv/' folder, Excel files in the 'excel/' folder.
+# Folders are created automatically if they do not exist.
+#
 # Example .env:
 # API_URL   = "https://kimai.ignitesolutions.click/api/timesheets"
 # API_TOKEN = "your_token_here"
@@ -111,6 +114,8 @@ def write_csv(filename: str, rows: List[List[str]]) -> None:
     """
     Write the provided rows to a CSV file with a header row.
     """
+    # Ensure the csv/ directory exists
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["begin","end","customer","project","activity","description"])
@@ -122,6 +127,8 @@ def write_excel(filename: str, rows: List[List[str]], total_hours: float) -> Non
     - 'Data': All timesheet entries
     - 'Summary': Total hours worked
     """
+    # Ensure the excel/ directory exists
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     with pd.ExcelWriter(filename, engine="openpyxl") as writer:
         df = pd.DataFrame(rows, columns=["begin","end","customer","project","activity","description"])
         df.to_excel(writer, sheet_name="Data", index=False)
@@ -182,13 +189,16 @@ def export(
         else:
             api_token = typer.prompt("Kimai API token (get from your Kimai profile)", hide_input=True)
 
+    # Set output file paths in csv/ and excel/ folders
+    csv_dir = "csv"
+    excel_dir = "excel"
+    if not output_csv:
+        output_csv = os.path.join(csv_dir, f"monthly-report-{year}-{int(month):02d}.csv")
+    if not output_xlsx:
+        output_xlsx = os.path.join(excel_dir, f"monthly-report-{year}-{int(month):02d}.xlsx")
+
     # Calculate date range for the selected month/year
     date_begin, date_end = get_month_range(year, int(month))
-    # Set output filenames if not provided
-    if not output_csv:
-        output_csv = f"monthly-report-{year}-{int(month):02d}.csv"
-    if not output_xlsx:
-        output_xlsx = f"monthly-report-{year}-{int(month):02d}.xlsx"
 
     typer.echo(f"Fetching timesheets for user {user_id}, {year}-{int(month):02d} ({MONTHS[int(month)-1][0]} / {MONTHS[int(month)-1][1]})...")
     entries = fetch_timesheets(api_url, api_token, user_id, date_begin, date_end)
